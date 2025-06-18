@@ -15,7 +15,6 @@ import {
   LinearProgress,
   Card,
   CardContent,
-  Grid,
   Select,
   MenuItem,
   InputLabel,
@@ -24,6 +23,7 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material';
+
 import {
   CloudUpload,
   CompareArrows,
@@ -355,8 +355,8 @@ function App() {
               Compression Options
             </Typography>
             
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <Box sx={{ width: '100%' }}>
                 <FormControl fullWidth sx={{ mb: 2 }}>
                   <InputLabel id="compression-level-label">Compression Level</InputLabel>
                   <Select
@@ -371,9 +371,9 @@ function App() {
                     <MenuItem value="high">High (Smaller Size)</MenuItem>
                   </Select>
                 </FormControl>
-              </Grid>
+              </Box>
               
-              <Grid item xs={12}>
+              <Box sx={{ width: '100%' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <Typography id="quality-slider-label" gutterBottom sx={{ mr: 2 }}>
                     Quality:
@@ -392,9 +392,9 @@ function App() {
                     {options.quality}%
                   </Typography>
                 </Box>
-              </Grid>
+              </Box>
               
-              <Grid item xs={12}>
+              <Box sx={{ width: '100%' }}>
                 <FormControlLabel
                   control={
                     <Switch
@@ -414,8 +414,8 @@ function App() {
                     </Box>
                   }
                 />
-              </Grid>
-            </Grid>
+              </Box>
+            </Box>
             
             <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
               <Button
@@ -452,24 +452,24 @@ function App() {
               Compression Results
             </Typography>
             
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid item xs={6}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
+              <Box sx={{ flex: '1 1 45%' }}>
                 <Typography variant="body2" color="text.secondary">Original Size</Typography>
                 <Typography variant="h6">{formatFileSize(fileState.originalSize)}</Typography>
-              </Grid>
-              <Grid item xs={6}>
+              </Box>
+              <Box sx={{ flex: '1 1 45%' }}>
                 <Typography variant="body2" color="text.secondary">Compressed Size</Typography>
                 <Typography variant="h6">{formatFileSize(fileState.compressedSize)}</Typography>
-              </Grid>
-              <Grid item xs={12}>
+              </Box>
+              <Box sx={{ width: '100%' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
                   <PictureAsPdf sx={{ color: 'success.main', mr: 1 }} />
                   <Typography variant="body1" color="success.main" fontWeight="medium">
                     Reduced by {getCompressionPercentage()}% ({formatFileSize(fileState.originalSize - fileState.compressedSize)})
                   </Typography>
                 </Box>
-              </Grid>
-            </Grid>
+              </Box>
+            </Box>
             
             <Stack direction="row" spacing={2} justifyContent="center">
               <Button
