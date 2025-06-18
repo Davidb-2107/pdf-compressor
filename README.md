@@ -48,6 +48,23 @@ npm run build          # outputs optimized static files in ./build
 
 You can then serve the `build` folder with any static host (Netlify, Vercel, GitHub Pages, S3, etc.).
 
+### 3.1 Local preview / quick deploy
+
+If you just want to spin-up a local web-server to validate the production build, a _deploy_ script is provided:
+
+```bash
+# Build and immediately serve on http://localhost:8080
+npm run deploy:build
+
+# (or) if you already have a ./build folder
+npm run deploy            # serves ./build
+
+# options
+node deploy.js --port 9000 --host 0.0.0.0 --open false
+```
+
+The script uses **express** to serve the static files and (by default) opens your browser automatically.
+
 ---
 
 ## 4. Usage Guide
