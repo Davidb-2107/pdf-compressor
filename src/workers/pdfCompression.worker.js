@@ -6,6 +6,8 @@
  * while preserving visual quality.
  */
 
+/* eslint-disable no-restricted-globals */
+
 import { PDFDocument, PDFRef, PDFDict, PDFName, PDFArray } from 'pdf-lib';
 
 // Listen for messages from the main thread
