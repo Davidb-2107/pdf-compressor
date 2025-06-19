@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { PDFDocument } from 'pdf-lib';
 import { saveAs } from 'file-saver';
 import {
   Box,
@@ -32,6 +31,10 @@ import {
   Info,
   PictureAsPdf,
 } from '@mui/icons-material';
+
+// Import the real compression service and types
+import { compressPDF as compressPDFService } from './services/pdfCompressionService';
+import { PDFCompressionOptions } from './types/compression';
 
 // Types for our application
 interface CompressionOptions {
@@ -139,7 +142,7 @@ function App() {
     };
   }, [fileState.preview, fileState.compressedPreview]);
 
-  // Compress PDF function
+  // Compress PDF function - updated to use real compression
   const compressPDF = async () => {
     if (!fileState.file) return;
 
@@ -151,77 +154,34 @@ function App() {
         error: null,
       }));
 
-      // Simulate progress updates
-      const progressInterval = setInterval(() => {
-        setFileState(prev => ({
-          ...prev,
-          progress: Math.min(prev.progress + 5, 90),
-        }));
-      }, 200);
+      // Create compression options based on user settings
+      const compressionOptions: PDFCompressionOptions = {
+        quality: options.quality,
+        compressionLevel: options.compressionLevel,
+        preserveQuality: options.preserveQuality,
+      };
 
-      // Read the PDF file
-      const fileData = await fileState.file.arrayBuffer();
-      
-      // Load the PDF document
-      const pdfDoc = await PDFDocument.load(fileData, {
-        updateMetadata: false,
-      });
+      // Use the real compression service with progress updates
+      const result = await compressPDFService(
+        fileState.file,
+        compressionOptions,
+        (progress, message) => {
+          setFileState(prev => ({
+            ...prev,
+            progress,
+          }));
+        }
+      );
 
-      // Apply compression based on options
-      // Note: pdf-lib doesn't directly support quality compression
-      // This is a simplified approach - in a real app, you might use
-      // server-side tools like Ghostscript for better compression
-      
-      // For this demo, we'll simulate compression by:
-      // 1. Copying the PDF
-      // 2. Adjusting metadata based on compression level
-      
-      // In a production app, you'd implement actual compression algorithms
-      // or use a backend service with more powerful PDF libraries
-
-      // Simulate processing time based on compression level
-      const processingTime = 
-        options.compressionLevel === 'low' ? 1000 :
-        options.compressionLevel === 'medium' ? 2000 : 3000;
-      
-      await new Promise(resolve => setTimeout(resolve, processingTime));
-      
-      // Save the "compressed" PDF
-      const compressedPdfBytes = await pdfDoc.save();
-      
-      // Calculate compression ratio (in a real app, this would be actual compression)
-      // Here we're simulating compression results
-      let compressionFactor;
-      switch (options.compressionLevel) {
-        case 'low':
-          compressionFactor = 0.9; // 10% reduction
-          break;
-        case 'medium':
-          compressionFactor = 0.7; // 30% reduction
-          break;
-        case 'high':
-          compressionFactor = options.preserveQuality ? 0.5 : 0.3; // 50-70% reduction
-          break;
-        default:
-          compressionFactor = 0.7;
-      }
-      
-      // Create a blob from the compressed PDF
-      const compressedBlob = new Blob([compressedPdfBytes], { type: 'application/pdf' });
-      const compressedSize = Math.floor(fileState.originalSize * compressionFactor);
-      
-      // Clear the progress interval
-      clearInterval(progressInterval);
-      
       // Create a preview URL for the compressed PDF
-      const compressedPreviewUrl = URL.createObjectURL(compressedBlob);
+      const compressedPreviewUrl = URL.createObjectURL(result.compressedFile);
       
       // Update state with compression results
       setFileState(prev => ({
         ...prev,
-        compressedFile: compressedBlob,
+        compressedFile: result.compressedFile,
         compressedPreview: compressedPreviewUrl,
-        compressedSize: compressedSize,
+        compressedSize: result.compressedSize,
         isProcessing: false,
         progress: 100,
       }));
@@ -240,7 +200,7 @@ function App() {
         ...prev,
         isProcessing: false,
         progress: 0,
-        error: 'Failed to compress PDF. Please try again.',
+        error: error instanceof Error ? error.message : 'Failed to compress PDF. Please try again.',
       }));
     }
   };
