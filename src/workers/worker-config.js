@@ -13,13 +13,16 @@
  * @returns {Worker} - The created Worker instance
  */
 export const createWorker = (workerPath, options = {}) => {
-  // Use URL constructor with import.meta.url for proper resolution in both dev and prod
-  const workerUrl = new URL(`../${workerPath}`, import.meta.url);
-  
-  return new Worker(workerUrl, { 
-    type: 'module',  // Use module workers for better compatibility with CRA
-    ...options 
-  });
+  /**
+   * The worker file lives in the CRA `public/` folder.  
+   * In development `process.env.PUBLIC_URL` is an empty string and the file is
+   * served from `/`, while in production it resolves to the correct base-path.
+   */
+  const urlPrefix = process.env.PUBLIC_URL || '';
+  // Ensure we have a single leading slash:  `/pdfCompression.worker.js`
+  const workerUrl = `${urlPrefix}/${workerPath}`.replace(/\/\/+/g, '/');
+
+  return new Worker(workerUrl, options);
 };
 
 /**

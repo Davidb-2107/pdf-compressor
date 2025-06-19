@@ -7,10 +7,7 @@
  */
 
 import { PDFCompressionOptions, CompressionResult, ProgressCallback } from '../types/compression';
-
-// Use dynamic import for the worker to ensure it's properly bundled
-// This creates a new worker instance each time it's needed
-const createWorker = () => new Worker(new URL('../workers/pdfCompression.worker.js', import.meta.url), { type: 'module' });
+import { createWorker } from '../workers/worker-config.js';
 
 /**
  * Compresses a PDF file using the specified options
@@ -27,7 +24,8 @@ export const compressPDF = (
 ): Promise<CompressionResult> => {
   return new Promise((resolve, reject) => {
     // Create a new worker instance
-    const worker = createWorker();
+    // Worker lives in the CRA `public/` folder
+    const worker = createWorker('pdfCompression.worker.js');
     
     // Set up message handler
     worker.onmessage = (event) => {
@@ -91,7 +89,8 @@ export const createCancelableCompression = (
   options: PDFCompressionOptions,
   onProgress?: ProgressCallback
 ) => {
-  let worker: Worker | null = createWorker();
+  // Create the worker up-front so we can terminate it on cancel
+  let worker: Worker | null = createWorker('pdfCompression.worker.js');
   
   const compressionPromise = new Promise<CompressionResult>((resolve, reject) => {
     if (!worker) {
