@@ -4,7 +4,6 @@ import { saveAs } from 'file-saver';
 import {
   Box,
   Button,
-  Container,
   Typography,
   Paper,
   Slider,
@@ -22,7 +21,6 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material';
-
 import {
   CloudUpload,
   CompareArrows,
@@ -33,16 +31,93 @@ import {
 } from '@mui/icons-material';
 
 // Import the real compression service and types
-import { compressPDF as compressPDFService } from './services/pdfCompressionService';
-import { PDFCompressionOptions } from './types/compression';
+import { compressPDF as compressPDFService } from '../services/pdfCompressionService';
+import { PDFCompressionOptions } from '../types/compression';
 
-// Types for our application
-interface CompressionOptions {
-  quality: number;
-  preserveQuality: boolean;
-  compressionLevel: 'low' | 'medium' | 'high';
+// Types for component props
+export interface PDFCompressorProps {
+  /**
+   * Maximum file size in bytes (default: 100MB)
+   */
+  maxFileSize?: number;
+  
+  /**
+   * Default compression options
+   */
+  defaultOptions?: {
+    quality?: number;
+    preserveQuality?: boolean;
+    compressionLevel?: 'low' | 'medium' | 'high';
+  };
+  
+  /**
+   * Custom class name for the component
+   */
+  className?: string;
+  
+  /**
+   * Callback fired when compression starts
+   */
+  onCompressionStart?: () => void;
+  
+  /**
+   * Callback fired when compression completes successfully
+   * @param result - Compression result with file and stats
+   */
+  onCompressionComplete?: (result: {
+    compressedFile: Blob;
+    originalSize: number;
+    compressedSize: number;
+    compressionRatio: number;
+  }) => void;
+  
+  /**
+   * Callback fired when compression fails
+   * @param error - Error object or message
+   */
+  onCompressionError?: (error: Error | string) => void;
+  
+  /**
+   * Callback fired when the user downloads the compressed file
+   * @param file - The downloaded file blob
+   */
+  onDownload?: (file: Blob) => void;
+  
+  /**
+   * Whether to show the file drop zone (default: true)
+   */
+  showDropZone?: boolean;
+  
+  /**
+   * Whether to show compression options (default: true)
+   */
+  showOptions?: boolean;
+  
+  /**
+   * Whether to show compression results (default: true)
+   */
+  showResults?: boolean;
+  
+  /**
+   * Custom text for the drop zone
+   */
+  dropZoneText?: {
+    idle?: string;
+    active?: string;
+    hint?: string;
+  };
+  
+  /**
+   * Custom text for buttons
+   */
+  buttonText?: {
+    compress?: string;
+    download?: string;
+    reset?: string;
+  };
 }
 
+// Component state interface
 interface FileState {
   file: File | null;
   preview: string | null;
@@ -55,7 +130,45 @@ interface FileState {
   error: string | null;
 }
 
-function App() {
+// Compression options interface
+interface CompressionOptions {
+  quality: number;
+  preserveQuality: boolean;
+  compressionLevel: 'low' | 'medium' | 'high';
+}
+
+/**
+ * PDFCompressor - A reusable component for PDF compression
+ * 
+ * This component provides a complete UI for compressing PDF files
+ * using a Web Worker-based compression service.
+ */
+const PDFCompressor: React.FC<PDFCompressorProps> = ({
+  maxFileSize = 104857600, // 100MB default
+  defaultOptions = {
+    quality: 80,
+    preserveQuality: true,
+    compressionLevel: 'medium',
+  },
+  className,
+  onCompressionStart,
+  onCompressionComplete,
+  onCompressionError,
+  onDownload,
+  showDropZone = true,
+  showOptions = true,
+  showResults = true,
+  dropZoneText = {
+    idle: 'Drag & drop your PDF file here',
+    active: 'Drop your PDF here',
+    hint: 'or click to select a file',
+  },
+  buttonText = {
+    compress: 'Compress PDF',
+    download: 'Download Compressed PDF',
+    reset: 'Compress Another PDF',
+  },
+}) => {
   // State for file handling
   const [fileState, setFileState] = useState<FileState>({
     file: null,
@@ -71,9 +184,9 @@ function App() {
 
   // State for compression options
   const [options, setOptions] = useState<CompressionOptions>({
-    quality: 80,
-    preserveQuality: true,
-    compressionLevel: 'medium',
+    quality: defaultOptions.quality ?? 80,
+    preserveQuality: defaultOptions.preserveQuality ?? true,
+    compressionLevel: defaultOptions.compressionLevel ?? 'medium',
   });
 
   // Handle file drop
@@ -87,6 +200,15 @@ function App() {
       setFileState(prev => ({
         ...prev,
         error: 'Only PDF files are supported.',
+      }));
+      return;
+    }
+    
+    // Check file size
+    if (file.size > maxFileSize) {
+      setFileState(prev => ({
+        ...prev,
+        error: `File size exceeds the maximum allowed size (${formatFileSize(maxFileSize)}).`,
       }));
       return;
     }
@@ -111,7 +233,7 @@ function App() {
       progress: 0,
       error: null,
     });
-  }, []);
+  }, [maxFileSize]);
 
   // Configure dropzone
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -120,6 +242,7 @@ function App() {
       'application/pdf': ['.pdf'],
     },
     maxFiles: 1,
+    disabled: fileState.isProcessing,
   });
 
   // Handle compression options change
@@ -142,11 +265,16 @@ function App() {
     };
   }, [fileState.preview, fileState.compressedPreview]);
 
-  // Compress PDF function - updated to use real compression
+  // Compress PDF function - uses real compression
   const compressPDF = async () => {
     if (!fileState.file) return;
 
     try {
+      // Call the onCompressionStart callback if provided
+      if (onCompressionStart) {
+        onCompressionStart();
+      }
+      
       setFileState(prev => ({
         ...prev,
         isProcessing: true,
@@ -186,6 +314,16 @@ function App() {
         progress: 100,
       }));
       
+      // Call the onCompressionComplete callback if provided
+      if (onCompressionComplete) {
+        onCompressionComplete({
+          compressedFile: result.compressedFile,
+          originalSize: result.originalSize,
+          compressedSize: result.compressedSize,
+          compressionRatio: result.compressionRatio,
+        });
+      }
+      
       // Reset progress after a short delay
       setTimeout(() => {
         setFileState(prev => ({
@@ -196,12 +334,20 @@ function App() {
       
     } catch (error) {
       console.error('Error compressing PDF:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Failed to compress PDF. Please try again.';
+      
       setFileState(prev => ({
         ...prev,
         isProcessing: false,
         progress: 0,
-        error: error instanceof Error ? error.message : 'Failed to compress PDF. Please try again.',
+        error: errorMessage,
       }));
+      
+      // Call the onCompressionError callback if provided
+      if (onCompressionError) {
+        onCompressionError(error instanceof Error ? error : errorMessage);
+      }
     }
   };
 
@@ -211,6 +357,11 @@ function App() {
     
     const fileName = fileState.file.name.replace('.pdf', '-compressed.pdf');
     saveAs(fileState.compressedFile, fileName);
+    
+    // Call the onDownload callback if provided
+    if (onDownload && fileState.compressedFile) {
+      onDownload(fileState.compressedFile);
+    }
   };
 
   // Reset the application state
@@ -253,52 +404,46 @@ function App() {
   };
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Typography variant="h3" component="h1" gutterBottom align="center" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
-        PDF Compressor
-      </Typography>
-      
-      <Typography variant="subtitle1" gutterBottom align="center" sx={{ mb: 4, color: 'text.secondary' }}>
-        Compress your PDF files while preserving quality
-      </Typography>
-      
+    <Box className={className}>
       {/* File Drop Zone */}
-      <Paper
-        elevation={3}
-        sx={{
-          p: 3,
-          mb: 4,
-          borderRadius: 2,
-          backgroundColor: isDragActive ? 'rgba(25, 118, 210, 0.08)' : 'white',
-          border: isDragActive ? '2px dashed #1976d2' : '2px dashed #ccc',
-          transition: 'all 0.3s ease',
-        }}
-        {...getRootProps()}
-      >
-        <input {...getInputProps()} />
-        <Box
+      {showDropZone && !fileState.compressedFile && (
+        <Paper
+          elevation={3}
           sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            py: 4,
+            p: 3,
+            mb: 4,
+            borderRadius: 2,
+            backgroundColor: isDragActive ? 'rgba(25, 118, 210, 0.08)' : 'white',
+            border: isDragActive ? '2px dashed #1976d2' : '2px dashed #ccc',
+            transition: 'all 0.3s ease',
           }}
+          {...getRootProps()}
         >
-          <CloudUpload sx={{ fontSize: 64, color: isDragActive ? '#1976d2' : '#9e9e9e', mb: 2 }} />
-          <Typography variant="h6" align="center" sx={{ mb: 1 }}>
-            {isDragActive ? 'Drop your PDF here' : 'Drag & drop your PDF file here'}
-          </Typography>
-          <Typography variant="body2" align="center" color="text.secondary">
-            or click to select a file
-          </Typography>
-          {fileState.file && (
-            <Typography variant="body1" sx={{ mt: 2, fontWeight: 'medium' }}>
-              Selected: {fileState.file.name} ({formatFileSize(fileState.originalSize)})
+          <input {...getInputProps()} />
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              py: 4,
+            }}
+          >
+            <CloudUpload sx={{ fontSize: 64, color: isDragActive ? '#1976d2' : '#9e9e9e', mb: 2 }} />
+            <Typography variant="h6" align="center" sx={{ mb: 1 }}>
+              {isDragActive ? dropZoneText.active : dropZoneText.idle}
             </Typography>
-          )}
-        </Box>
-      </Paper>
+            <Typography variant="body2" align="center" color="text.secondary">
+              {dropZoneText.hint}
+            </Typography>
+            {fileState.file && (
+              <Typography variant="body1" sx={{ mt: 2, fontWeight: 'medium' }}>
+                Selected: {fileState.file.name} ({formatFileSize(fileState.originalSize)})
+              </Typography>
+            )}
+          </Box>
+        </Paper>
+      )}
       
       {/* Error Message */}
       {fileState.error && (
@@ -308,7 +453,7 @@ function App() {
       )}
       
       {/* Compression Options */}
-      {fileState.file && !fileState.compressedFile && (
+      {showOptions && fileState.file && !fileState.compressedFile && (
         <Card elevation={2} sx={{ mb: 4 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -387,7 +532,7 @@ function App() {
                 startIcon={<CompareArrows />}
                 sx={{ px: 4 }}
               >
-                {fileState.isProcessing ? 'Compressing...' : 'Compress PDF'}
+                {fileState.isProcessing ? 'Compressing...' : buttonText.compress}
               </Button>
             </Box>
           </CardContent>
@@ -405,7 +550,7 @@ function App() {
       )}
       
       {/* Results */}
-      {fileState.compressedFile && (
+      {showResults && fileState.compressedFile && (
         <Card elevation={3} sx={{ mb: 4 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -438,25 +583,25 @@ function App() {
                 startIcon={<Download />}
                 onClick={downloadCompressedPDF}
               >
-                Download Compressed PDF
+                {buttonText.download}
               </Button>
               <Button
                 variant="outlined"
                 startIcon={<Refresh />}
                 onClick={resetState}
               >
-                Compress Another PDF
+                {buttonText.reset}
               </Button>
             </Stack>
           </CardContent>
         </Card>
       )}
       
-      <Typography variant="body2" align="center" color="text.secondary" sx={{ mt: 4 }}>
+      <Typography variant="body2" align="center" color="text.secondary" sx={{ mt: 2 }}>
         All processing happens in your browser. Your files are never uploaded to any server.
       </Typography>
-    </Container>
+    </Box>
   );
-}
+};
 
-export default App;
+export default PDFCompressor;
