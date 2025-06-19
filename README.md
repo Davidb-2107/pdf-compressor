@@ -94,7 +94,16 @@ The script uses **express** to serve the static files and (by default) opens you
 | Styling | MUI + custom CSS | Dropzone styling, animations, scrollbar |
 | Build | CRA (Create-React-App) with TypeScript template | Easy local dev & production build |
 
-Current compression is a **simulation** (size reduction factor applied after save). For production-grade compression, integrate Ghostscript, qpdf or a WebAssembly port that supports image downsampling and object stream compression.
+| PDF processing | **pdf-lib + Web Worker pipeline** | Executes *real* optimisation (metadata removal, object-stream compression and optional image down-sampling) off-main-thread |
+
+### Compression engine  
+Compression now happens in a dedicated **Web Worker**.  
+The worker:
+1. Loads the document with `pdf-lib`  
+2. Strips metadata & thumbnails, optimises object streams  
+3. Optionally down-samples embedded images based on the quality slider  
+4. Saves with aggressive compression flags  
+This provides genuine file-size reduction while keeping every byte of processing in the browser.
 
 ---
 
